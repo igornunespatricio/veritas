@@ -79,11 +79,37 @@ def get_anthropic_llm(
     )
 
 
+def get_openrouter_llm(
+    model: str = "openai/gpt-5-nano",
+    temperature: float = 0.7,
+    **kwargs,
+) -> ChatOpenAI:
+    """Get configured OpenRouter LLM client using LangChain.
+
+    Args:
+        model: Model name to use (default: "openai/gpt-5-nano")
+        temperature: Sampling temperature (0.0 = deterministic, 1.0 = creative)
+        **kwargs: Additional arguments passed to ChatOpenAI
+
+    Returns:
+        Configured ChatOpenAI instance for OpenRouter
+    """
+    if not settings.openrouter_api_key:
+        raise ValueError("OpenRouter API key not configured")
+    return ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        api_key=settings.openrouter_api_key,
+        base_url="https://openrouter.ai/api/v1",
+        **kwargs,
+    )
+
+
 def get_llm(provider: str = "openai", **kwargs) -> ChatOpenAI | ChatAnthropic:
     """Factory function to get LLM client based on provider.
 
     Args:
-        provider: LLM provider ("openai" or "anthropic")
+        provider: LLM provider ("openai", "anthropic", or "openrouter")
         **kwargs: Additional arguments passed to LLM constructor
 
     Returns:
@@ -91,6 +117,8 @@ def get_llm(provider: str = "openai", **kwargs) -> ChatOpenAI | ChatAnthropic:
     """
     if provider == "anthropic":
         return get_anthropic_llm(**kwargs)
+    if provider == "openrouter":
+        return get_openrouter_llm(**kwargs)
     return get_openai_llm(**kwargs)
 
 
@@ -265,7 +293,7 @@ def get_resilient_llm(
     """Factory function to get resilient LLM client.
 
     Args:
-        provider: LLM provider ("openai" or "anthropic")
+        provider: LLM provider ("openai", "anthropic", or "openrouter")
         retry_config: Custom retry configuration
         circuit_config: Custom circuit breaker configuration
         **kwargs: Additional arguments passed to LLM constructor

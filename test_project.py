@@ -15,7 +15,7 @@ async def main():
     # Initialize the workflow
     # workflow = ResearchWorkflow()
     workflow = ResearchWorkflow(
-        llm_provider="anthropic", llm_model="claude-sonnet-4-20250514"
+        llm_provider="openrouter", llm_model="openai/gpt-5-nano"
     )
 
     # Test topic
