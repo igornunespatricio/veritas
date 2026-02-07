@@ -60,22 +60,43 @@ class ResearchWorkflow:
         self,
         max_iterations: int = 3,
         auto_approve_threshold: float = 0.8,
+        llm_provider: str = "openai",
+        llm_model: str = "gpt-4o",
     ):
         """Initialize workflow with agents.
 
         Args:
             max_iterations: Maximum review iterations
             auto_approve_threshold: Score threshold for auto-approval
+            llm_provider: LLM provider to use ("openai" or "anthropic")
+            llm_model: Model name to use (e.g., "gpt-4o", "claude-sonnet-4-20250514")
         """
         self.max_iterations = max_iterations
         self.auto_approve_threshold = auto_approve_threshold
+        self.llm_provider = llm_provider
+        self.llm_model = llm_model
 
-        # Initialize agents
-        self.researcher = ResearcherAgent()
-        self.fact_checker = FactCheckerAgent()
-        self.synthesizer = SynthesizerAgent()
-        self.writer = WriterAgent()
-        self.critic = CriticAgent()
+        # Initialize agents with specified LLM provider/model
+        self.researcher = ResearcherAgent(
+            provider=llm_provider,
+            model=llm_model,
+        )
+        self.fact_checker = FactCheckerAgent(
+            provider=llm_provider,
+            model=llm_model,
+        )
+        self.synthesizer = SynthesizerAgent(
+            provider=llm_provider,
+            model=llm_model,
+        )
+        self.writer = WriterAgent(
+            provider=llm_provider,
+            model=llm_model,
+        )
+        self.critic = CriticAgent(
+            provider=llm_provider,
+            model=llm_model,
+        )
 
     async def execute(
         self,

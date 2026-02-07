@@ -13,7 +13,10 @@ async def main():
     print("=" * 60)
 
     # Initialize the workflow
-    workflow = ResearchWorkflow()
+    # workflow = ResearchWorkflow()
+    workflow = ResearchWorkflow(
+        llm_provider="anthropic", llm_model="claude-sonnet-4-20250514"
+    )
 
     # Test topic
     topic = "What is quantum computing and how does it work?"
