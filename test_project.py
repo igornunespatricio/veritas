@@ -2,12 +2,15 @@
 
 import asyncio
 
-
+from src.infrastructure.logging import setup_logging
 from src.orchestration import ResearchWorkflow
 
 
 async def main():
     """Run a simple test of the research workflow."""
+    # Setup logging based on environment
+    setup_logging()
+
     print("=" * 60)
     print("Veritas Multi-Agent Research Platform - Test")
     print("=" * 60)

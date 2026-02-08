@@ -1,6 +1,5 @@
 """Orchestration layer for multi-agent workflows."""
 
-import logging
 from dataclasses import dataclass
 from enum import Enum
 
@@ -19,8 +18,9 @@ from ..domain.events import (
     SynthesisCompleted,
 )
 from ..domain.interfaces import AgentContext
+from ..infrastructure.logging import get_logger, log_stage
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class WorkflowStage(Enum):
@@ -115,79 +115,82 @@ class ResearchWorkflow:
         context = AgentContext.create(correlation_id=correlation_id)
         result = WorkflowResult(status=WorkflowStage.RESEARCH)
 
-        logger.info(
-            f"Starting research workflow for topic: {topic}",
-            extra={"correlation_id": context.correlation_id},
-        )
+        logger.info(f"🚀 Starting research workflow: {topic}")
 
         try:
             # Stage 1: Research
-            logger.info(
-                "Stage: Research", extra={"correlation_id": context.correlation_id}
-            )
+            log_stage("RESEARCH", "Gathering sources and findings...")
             result.research = await self.researcher.research(topic, context)
+            log_stage(
+                "RESEARCH",
+                f"✅ Found {len(result.research.sources)} sources, {len(result.research.findings)} findings",
+            )
             result.status = WorkflowStage.FACT_CHECK
 
             # Stage 2: Fact-Check
-            logger.info(
-                "Stage: Fact-Check", extra={"correlation_id": context.correlation_id}
-            )
+            log_stage("FACT-CHECK", "Verifying claims against sources...")
             result.fact_check = await self.fact_checker.verify_claims(
                 claims=result.research.findings,
                 sources=result.research.sources,
                 context=context,
             )
+            verified = len(
+                [c for c in result.fact_check.claims if c.get("verified", False)]
+            )
+            disputed = len(
+                [c for c in result.fact_check.claims if c.get("disputed", False)]
+            )
+            log_stage("FACT-CHECK", f"✅ Verified: {verified} | Disputed: {disputed}")
             result.status = WorkflowStage.SYNTHESIS
 
             # Stage 3: Synthesis
-            logger.info(
-                "Stage: Synthesis", extra={"correlation_id": context.correlation_id}
-            )
+            log_stage("SYNTHESIS", "Merging research into coherent insights...")
             result.synthesis = await self.synthesizer.synthesize(
                 research=result.research,
                 fact_check=result.fact_check,
                 context=context,
             )
+            log_stage(
+                "SYNTHESIS", f"✅ Generated {len(result.synthesis.insights)} insights"
+            )
             result.status = WorkflowStage.WRITING
 
             # Stage 4: Writing
-            logger.info(
-                "Stage: Writing", extra={"correlation_id": context.correlation_id}
-            )
+            log_stage("WRITING", "Drafting structured report...")
             result.report = await self.writer.write_report(
                 synthesis=result.synthesis,
                 format="markdown",
                 context=context,
             )
+            log_stage(
+                "WRITING", f"✅ Report complete ({len(result.report.content)} chars)"
+            )
             result.status = WorkflowStage.REVIEW
 
             # Stage 5: Review (with iteration)
             for iteration in range(self.max_iterations):
-                logger.info(
-                    f"Review iteration {iteration + 1}",
-                    extra={"correlation_id": context.correlation_id},
+                log_stage(
+                    "REVIEW", f"Iteration {iteration + 1}/{self.max_iterations}..."
                 )
                 result.review = await self.critic.review(result.report, context)
                 result.iterations = iteration + 1
 
                 if result.review.approved:
-                    logger.info(
-                        "Report approved",
-                        extra={"correlation_id": context.correlation_id},
+                    log_stage(
+                        "REVIEW",
+                        f"✅ Report approved (score: {result.review.score:.2f})",
                     )
                     break
 
                 if result.review.score >= self.auto_approve_threshold:
-                    logger.info(
-                        f"Report approved (score: {result.review.score})",
-                        extra={"correlation_id": context.correlation_id},
+                    log_stage(
+                        "REVIEW", f"✅ Auto-approved (score: {result.review.score:.2f})"
                     )
                     break
 
                 # Revision needed - rewrite with feedback
-                logger.info(
-                    "Report requires revision",
-                    extra={"correlation_id": context.correlation_id},
+                log_stage(
+                    "REVIEW", f"⚠️  Needs revision (score: {result.review.score:.2f})"
                 )
                 # Create enhanced synthesis with criticism
                 # For simplicity, re-run synthesis and writing
