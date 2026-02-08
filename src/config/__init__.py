@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = None
     openrouter_api_key: str | None = None
 
+    # Web Search
+    tavily_api_key: str | None = None
+
     # Optional: LangSmith Observability
     langsmith_api_key: str | None = None
     langsmith_tracing: bool = False
