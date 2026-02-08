@@ -31,7 +31,8 @@ Be thorough but constructive. Your feedback should help improve the report."""
         self,
         provider: str = "openai",
         model: str = "gpt-4o",
-        temperature: float = 0.4,  # Critical but fair assessment
+        temperature: float = 0.4,
+        max_tokens: int | None = None,
     ):
         super().__init__(
             name="critic",
@@ -39,6 +40,7 @@ Be thorough but constructive. Your feedback should help improve the report."""
             llm_provider=provider,
             llm_model=model,
             llm_temperature=temperature,
+            llm_max_tokens=max_tokens,
         )
 
     async def _run(

@@ -66,6 +66,7 @@ Return your findings in JSON format with:
         provider: str = "openai",
         model: str = "gpt-4o",
         temperature: float = 0.7,
+        max_tokens: int | None = None,
     ):
         """Initialize researcher agent.
 
@@ -73,6 +74,7 @@ Return your findings in JSON format with:
             provider: LLM provider ("openai" or "anthropic")
             model: Model name to use
             temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate (None = unlimited)
         """
         super().__init__(
             name="researcher",
@@ -80,6 +82,7 @@ Return your findings in JSON format with:
             llm_provider=provider,
             llm_model=model,
             llm_temperature=temperature,
+            llm_max_tokens=max_tokens,
         )
 
         # Initialize the web search tool

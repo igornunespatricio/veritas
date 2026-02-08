@@ -55,8 +55,16 @@ def get_web_search_tool(max_results: int = 5) -> Any:
         Returns:
             Search results as formatted string
         """
+        # Clean up query from ReAct format
+        clean_query = query
+        if "Action Input:" in query:
+            clean_query = query.split("Action Input:")[-1].strip()
+
+        # Truncate to Tavily's 400 character limit
+        clean_query = clean_query[:400]
+
         try:
-            response = client.search(query=query, max_results=max_results)
+            response = client.search(query=clean_query, max_results=max_results)
             # Format the response nicely
             results = response.get("results", [])
             if not results:

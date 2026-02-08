@@ -31,6 +31,7 @@ Focus on creating actionable insights from the data."""
         provider: str = "openai",
         model: str = "gpt-4o",
         temperature: float = 0.5,
+        max_tokens: int | None = None,
     ):
         super().__init__(
             name="synthesizer",
@@ -38,6 +39,7 @@ Focus on creating actionable insights from the data."""
             llm_provider=provider,
             llm_model=model,
             llm_temperature=temperature,
+            llm_max_tokens=max_tokens,
         )
 
     async def _run(

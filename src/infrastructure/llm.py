@@ -37,6 +37,7 @@ def get_openai_llm(
     model: str = "gpt-4o",
     temperature: float = 0.7,
     max_retries: int = 5,
+    max_tokens: int | None = None,
 ) -> ChatOpenAI:
     """Get configured OpenAI LLM client with retry configuration.
 
@@ -44,21 +45,26 @@ def get_openai_llm(
         model: Model name to use
         temperature: Sampling temperature (0.0 = deterministic, 1.0 = creative)
         max_retries: Maximum number of retries on rate limit errors
+        max_tokens: Maximum number of tokens to generate (None = unlimited)
 
     Returns:
         Configured ChatOpenAI instance
     """
-    return ChatOpenAI(
+    kwargs = dict(
         model=model,
         temperature=temperature,
         api_key=settings.openai_api_key,
         max_retries=max_retries,
     )
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
+    return ChatOpenAI(**kwargs)
 
 
 def get_anthropic_llm(
     model_name: str = "claude-sonnet-4-20250514",
     temperature: float = 0.7,
+    max_tokens: int | None = None,
     **kwargs,
 ) -> ChatAnthropic:
     """Get configured Anthropic LLM client.
@@ -66,11 +72,13 @@ def get_anthropic_llm(
     Args:
         model_name: Model name to use
         temperature: Sampling temperature (0.0 = deterministic, 1.0 = creative)
+        max_tokens: Maximum tokens to generate (None = unlimited)
         **kwargs: Additional arguments passed to ChatAnthropic
 
     Returns:
         Configured ChatAnthropic instance
     """
+    kwargs["max_tokens"] = max_tokens if max_tokens is not None else 4096
     return ChatAnthropic(
         model_name=model_name,
         temperature=temperature,
@@ -82,6 +90,7 @@ def get_anthropic_llm(
 def get_openrouter_llm(
     model: str = "openai/gpt-5-nano",
     temperature: float = 0.7,
+    max_tokens: int | None = None,
     **kwargs,
 ) -> ChatOpenAI:
     """Get configured OpenRouter LLM client using LangChain.
@@ -89,6 +98,7 @@ def get_openrouter_llm(
     Args:
         model: Model name to use (default: "openai/gpt-5-nano")
         temperature: Sampling temperature (0.0 = deterministic, 1.0 = creative)
+        max_tokens: Maximum tokens to generate (None = unlimited)
         **kwargs: Additional arguments passed to ChatOpenAI
 
     Returns:
@@ -96,13 +106,16 @@ def get_openrouter_llm(
     """
     if not settings.openrouter_api_key:
         raise ValueError("OpenRouter API key not configured")
-    return ChatOpenAI(
+
+    config_kwargs = dict(
         model=model,
         temperature=temperature,
         api_key=settings.openrouter_api_key,
         base_url="https://openrouter.ai/api/v1",
-        **kwargs,
     )
+    if max_tokens is not None:
+        config_kwargs["max_tokens"] = max_tokens
+    return ChatOpenAI(**config_kwargs, **kwargs)
 
 
 def get_llm(provider: str = "openai", **kwargs) -> ChatOpenAI | ChatAnthropic:

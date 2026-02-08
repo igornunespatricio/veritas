@@ -45,7 +45,8 @@ values listed above."""
         self,
         provider: str = "openai",
         model: str = "gpt-4o",
-        temperature: float = 0.3,  # Lower temperature for factual accuracy
+        temperature: float = 0.3,
+        max_tokens: int | None = None,
     ):
         super().__init__(
             name="fact_checker",
@@ -53,6 +54,7 @@ values listed above."""
             llm_provider=provider,
             llm_model=model,
             llm_temperature=temperature,
+            llm_max_tokens=max_tokens,
         )
 
     async def _run(

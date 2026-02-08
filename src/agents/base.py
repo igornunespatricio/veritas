@@ -34,6 +34,7 @@ class BaseAgent(Agent[AgentResult]):
         llm_provider: str = "openai",
         llm_model: str = "gpt-4o",
         llm_temperature: float = 0.7,
+        llm_max_tokens: int | None = None,
         retry_config: RetryConfig | None = None,
     ):
         """Initialize base agent.
@@ -44,6 +45,7 @@ class BaseAgent(Agent[AgentResult]):
             llm_provider: LLM provider ("openai" or "anthropic")
             llm_model: Model name to use
             llm_temperature: Sampling temperature
+            llm_max_tokens: Maximum tokens to generate (None = unlimited)
             retry_config: Custom retry configuration
         """
         self._name = name
@@ -55,6 +57,7 @@ class BaseAgent(Agent[AgentResult]):
             provider=llm_provider,
             model=llm_model,
             temperature=llm_temperature,
+            max_tokens=llm_max_tokens,
             retry_config=self._retry_config,
         )
         self._correlation_id: str | None = None

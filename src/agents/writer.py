@@ -31,6 +31,7 @@ Write publication-ready content that is accurate and engaging."""
         provider: str = "openai",
         model: str = "gpt-4o",
         temperature: float = 0.7,
+        max_tokens: int | None = None,
     ):
         super().__init__(
             name="writer",
@@ -38,6 +39,7 @@ Write publication-ready content that is accurate and engaging."""
             llm_provider=provider,
             llm_model=model,
             llm_temperature=temperature,
+            llm_max_tokens=max_tokens,
         )
 
     async def _run(
