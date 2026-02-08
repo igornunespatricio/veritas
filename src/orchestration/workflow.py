@@ -135,12 +135,25 @@ class ResearchWorkflow:
                 context=context,
             )
             verified = len(
-                [c for c in result.fact_check.claims if c.get("verified", False)]
+                [c for c in result.fact_check.claims if c.get("status") == "verified"]
+            )
+            partially = len(
+                [
+                    c
+                    for c in result.fact_check.claims
+                    if c.get("status") == "partially_verified"
+                ]
             )
             disputed = len(
-                [c for c in result.fact_check.claims if c.get("disputed", False)]
+                [c for c in result.fact_check.claims if c.get("status") == "disputed"]
             )
-            log_stage("FACT-CHECK", f"✅ Verified: {verified} | Disputed: {disputed}")
+            unverified = len(
+                [c for c in result.fact_check.claims if c.get("status") == "unverified"]
+            )
+            log_stage(
+                "FACT-CHECK",
+                f"✅ Verified: {verified} | Partial: {partially} | Disputed: {disputed} | Unverified: {unverified}",
+            )
             result.status = WorkflowStage.SYNTHESIS
 
             # Stage 3: Synthesis

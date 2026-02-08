@@ -10,6 +10,16 @@ from src.domain.interfaces import AgentContext
 from src.agents.base import BaseAgent
 
 
+# Claim verification status constants
+class ClaimStatus:
+    """Standard claim verification statuses."""
+
+    VERIFIED = "verified"
+    PARTIALLY_VERIFIED = "partially_verified"
+    DISPUTED = "disputed"
+    UNVERIFIED = "unverified"
+
+
 class FactCheckerAgent(BaseAgent[FactCheckCompleted]):
     """Fact-Checker Agent implementation.
 
@@ -17,17 +27,19 @@ class FactCheckerAgent(BaseAgent[FactCheckCompleted]):
     and assigns confidence scores.
     """
 
-    FACT_CHECKER_SYSTEM_PROMPT = """You are a professional fact-checker. Your task is to:
+    FACT_CHECKER_SYSTEM_PROMPT = f"""You are a professional fact-checker. Your task is to:
 1. Extract claims from the research findings
 2. Verify each claim against the provided sources
-3. Flag claims that are:
-   - Unsupported by evidence
-   - Contradicted by sources
-   - Partially supported
+3. Assign ONE of these status values to each claim:
+   - "{ClaimStatus.VERIFIED}" - Fully supported by multiple sources
+   - "{ClaimStatus.PARTIALLY_VERIFIED}" - Some support but with gaps or nuances
+   - "{ClaimStatus.DISPUTED}" - Contradicted or refuted by sources
+   - "{ClaimStatus.UNVERIFIED}" - No clear evidence either way
 4. Assign confidence scores (0.0 to 1.0) for each claim
 5. Provide reasoning for your assessments
 
-Be objective and cite specific evidence from sources."""
+Be objective and cite specific evidence from sources. Use ONLY the status
+values listed above."""
 
     def __init__(
         self,
@@ -71,9 +83,10 @@ Be objective and cite specific evidence from sources."""
                 f"FINDINGS:\n{findings_text}\n\n"
                 f"SOURCES:\n{sources_text}\n\n"
                 "Provide your analysis in JSON format with:\n"
-                "- claims: list of extracted claims\n"
-                "- verified_claims: list of claims with verification status\n"
-                "- confidence_scores: dict mapping claim to score (0.0-1.0)"
+                "- claims: list of objects with 'text' and 'status' keys\n"
+                "- verified_claims: list of verified claims with status\n"
+                "- confidence_scores: dict mapping claim text to score (0.0-1.0)\n\n"
+                "Each claim must have status: verified, partially_verified, disputed, or unverified"
             ),
         ]
 
@@ -91,13 +104,17 @@ Be objective and cite specific evidence from sources."""
                 verified_claims = data.get("verified_claims", [])
                 confidence_scores = data.get("confidence_scores", {})
             else:
-                claims = [{"text": content, "status": "unverified"}]
+                claims = [{"text": content, "status": ClaimStatus.UNVERIFIED}]
                 verified_claims = claims
                 confidence_scores = {content: 0.5}
         except json.JSONDecodeError:
-            claims = [{"text": content, "status": "unverified"}]
+            claims = [{"text": content, "status": ClaimStatus.UNVERIFIED}]
             verified_claims = claims
             confidence_scores = {content: 0.5}
+
+        # Normalize claim statuses to ensure valid values
+        claims = self._normalize_claim_statuses(claims)
+        verified_claims = self._normalize_claim_statuses(verified_claims)
 
         return FactCheckCompleted.create(
             claims=claims,
@@ -105,6 +122,37 @@ Be objective and cite specific evidence from sources."""
             confidence_scores=confidence_scores,
             correlation_id=context.correlation_id,
         )
+
+    def _normalize_claim_statuses(
+        self, claims: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Normalize claim statuses to valid values.
+
+        Args:
+            claims: List of claim dictionaries
+
+        Returns:
+            List with normalized status values
+        """
+        valid_statuses = {
+            ClaimStatus.VERIFIED,
+            ClaimStatus.PARTIALLY_VERIFIED,
+            ClaimStatus.DISPUTED,
+            ClaimStatus.UNVERIFIED,
+        }
+
+        normalized = []
+        for claim in claims:
+            status = claim.get("status", "")
+            # Normalize to valid status (case-insensitive match)
+            status_normalized = status.lower().replace(" ", "_")
+            if status_normalized in valid_statuses:
+                status = status_normalized
+            else:
+                status = ClaimStatus.UNVERIFIED
+            normalized.append({**claim, "status": status})
+
+        return normalized
 
     async def validate_input(self, input: Any) -> bool:
         """Validate input is a ResearchCompleted event."""
