@@ -2,9 +2,10 @@
 
 import asyncio
 import logging
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, Union
 
 from langchain_anthropic import ChatAnthropic
+from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from tenacity import (
     retry,
@@ -118,11 +119,38 @@ def get_openrouter_llm(
     return ChatOpenAI(**config_kwargs, **kwargs)
 
 
-def get_llm(provider: str = "openai", **kwargs) -> ChatOpenAI | ChatAnthropic:
+def get_ollama_llm(
+    model: str = "llama3.2:3b",
+    temperature: float = 0.7,
+    base_url: str = "http://localhost:11434",
+    **kwargs,
+) -> ChatOllama:
+    """Get configured Ollama LLM client for local models.
+
+    Args:
+        model: Model name to use (default: "llama3.2:3b")
+        temperature: Sampling temperature (0.0 = deterministic, 1.0 = creative)
+        base_url: Base URL for Ollama server (default: "http://localhost:11434")
+        **kwargs: Additional arguments passed to ChatOllama
+
+    Returns:
+        Configured ChatOllama instance
+    """
+    return ChatOllama(
+        model=model,
+        temperature=temperature,
+        base_url=base_url,
+        **kwargs,
+    )
+
+
+def get_llm(
+    provider: str = "openai", **kwargs
+) -> Union[ChatOpenAI, ChatAnthropic, ChatOllama]:
     """Factory function to get LLM client based on provider.
 
     Args:
-        provider: LLM provider ("openai", "anthropic", or "openrouter")
+        provider: LLM provider ("openai", "anthropic", "openrouter", or "ollama")
         **kwargs: Additional arguments passed to LLM constructor
 
     Returns:
@@ -132,6 +160,8 @@ def get_llm(provider: str = "openai", **kwargs) -> ChatOpenAI | ChatAnthropic:
         return get_anthropic_llm(**kwargs)
     if provider == "openrouter":
         return get_openrouter_llm(**kwargs)
+    if provider == "ollama":
+        return get_ollama_llm(**kwargs)
     return get_openai_llm(**kwargs)
 
 
@@ -146,7 +176,7 @@ class ResilientLLMWrapper:
 
     def __init__(
         self,
-        llm: ChatOpenAI | ChatAnthropic,
+        llm: Union[ChatOpenAI, ChatAnthropic, ChatOllama],
         retry_config: RetryConfig | None = None,
         circuit_config: CircuitBreakerConfig | None = None,
         correlation_id: str | None = None,
@@ -176,7 +206,7 @@ class ResilientLLMWrapper:
         )
 
     @property
-    def llm(self) -> ChatOpenAI | ChatAnthropic:
+    def llm(self) -> Union[ChatOpenAI, ChatAnthropic, ChatOllama]:
         """Access the underlying LLM client."""
         return self._llm
 
@@ -306,7 +336,7 @@ def get_resilient_llm(
     """Factory function to get resilient LLM client.
 
     Args:
-        provider: LLM provider ("openai", "anthropic", or "openrouter")
+        provider: LLM provider ("openai", "anthropic", "openrouter", or "ollama")
         retry_config: Custom retry configuration
         circuit_config: Custom circuit breaker configuration
         **kwargs: Additional arguments passed to LLM constructor

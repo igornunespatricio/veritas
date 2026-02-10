@@ -18,8 +18,8 @@ async def main():
     # Initialize the workflow
     # workflow = ResearchWorkflow()
     workflow = ResearchWorkflow(
-        llm_provider="openrouter",
-        llm_model="openai/gpt-5-nano",
+        llm_provider="ollama",
+        llm_model="llama3.2:3b",
         auto_approve_threshold=0.7,
         max_iterations=2,
         max_tokens=10000,
