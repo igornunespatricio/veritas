@@ -56,8 +56,13 @@ Write publication-ready content that is accurate and engaging."""
         Returns:
             ReportWritten event with title and content
         """
-        synthesis: SynthesisCompleted = inputs.get("synthesis")
-        report_format: str = inputs.get("format", "markdown")
+        synthesis = inputs.get("synthesis")
+        report_format = inputs.get("format", "markdown")
+
+        # Runtime type validation for type narrowing
+        assert isinstance(
+            synthesis, SynthesisCompleted
+        ), "synthesis must be SynthesisCompleted"
 
         insights_text = "\n".join(f"- {insight}" for insight in synthesis.insights)
 
@@ -123,8 +128,8 @@ Write publication-ready content that is accurate and engaging."""
     async def write_report(
         self,
         synthesis: SynthesisCompleted,
+        context: AgentContext,
         format: str = "markdown",
-        context: AgentContext = None,
     ) -> ReportWritten:
         """Convenience method to write a report."""
         return await self.execute(

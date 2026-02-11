@@ -56,8 +56,16 @@ Focus on creating actionable insights from the data."""
         Returns:
             SynthesisCompleted event with insights and resolved contradictions
         """
-        research: ResearchCompleted = inputs.get("research")
-        fact_check: FactCheckCompleted = inputs.get("fact_check")
+        research = inputs.get("research")
+        fact_check = inputs.get("fact_check")
+
+        # Runtime type validation for type narrowing
+        assert isinstance(
+            research, ResearchCompleted
+        ), "research must be ResearchCompleted"
+        assert isinstance(
+            fact_check, FactCheckCompleted
+        ), "fact_check must be FactCheckCompleted"
 
         findings_text = "\n".join(f"- {finding}" for finding in research.findings)
 
