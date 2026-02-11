@@ -1,7 +1,7 @@
 """Unit tests for domain interfaces."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, AsyncMock
 
 from src.domain.interfaces import (
@@ -26,9 +26,9 @@ class TestAgentContext:
 
     def test_create_sets_timestamp(self):
         """Test that create sets created_at timestamp."""
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
         context = AgentContext.create()
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
 
         assert context.created_at >= before
         assert context.created_at <= after

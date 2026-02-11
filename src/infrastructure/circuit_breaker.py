@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Callable
 
@@ -94,11 +94,9 @@ class CircuitBreaker:
         """Get current circuit state."""
         if self._state == CircuitState.OPEN:
             # Check if cooldown has passed
-            if (
-                self._opened_at
-                and self._opened_at + timedelta(seconds=self.config.cooldown_seconds)
-                < datetime.utcnow()
-            ):
+            if self._opened_at and self._opened_at + timedelta(
+                seconds=self.config.cooldown_seconds
+            ) < datetime.now(timezone.utc):
                 self._transition_to(CircuitState.HALF_OPEN)
                 return CircuitState.HALF_OPEN
         return self._state
@@ -123,7 +121,7 @@ class CircuitBreaker:
         """Record a successful call."""
         self._stats.total_calls += 1
         self._stats.successful_calls += 1
-        self._stats.last_success_time = datetime.utcnow()
+        self._stats.last_success_time = datetime.now(timezone.utc)
 
         if self._state == CircuitState.HALF_OPEN:
             self._success_count += 1
@@ -136,16 +134,16 @@ class CircuitBreaker:
         """Record a failed call."""
         self._stats.total_calls += 1
         self._stats.failed_calls += 1
-        self._stats.last_failure_time = datetime.utcnow()
-        self._last_failure_time = datetime.utcnow()
+        self._stats.last_failure_time = datetime.now(timezone.utc)
+        self._last_failure_time = datetime.now(timezone.utc)
 
         if self._state == CircuitState.HALF_OPEN:
             self._transition_to(CircuitState.OPEN)
-            self._opened_at = datetime.utcnow()
+            self._opened_at = datetime.now(timezone.utc)
         elif self._state == CircuitState.CLOSED:
             self._failure_count += 1
             if self._failure_count >= self.config.failure_threshold:
-                self._opened_at = datetime.utcnow()
+                self._opened_at = datetime.now(timezone.utc)
                 self._transition_to(CircuitState.OPEN)
 
     def allow_request(self) -> bool:

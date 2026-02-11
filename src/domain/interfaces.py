@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Generic, TypeVar
 
 from src.domain.events import DomainEvent
@@ -23,7 +23,7 @@ class AgentContext:
         return cls(
             correlation_id=correlation_id or "",
             request_id="",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             metadata={},
         )
 

@@ -1,7 +1,7 @@
 """Domain events for agent communication."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -26,7 +26,7 @@ class DomainEvent:
         """Factory method to create a domain event."""
         return cls(
             event_id=str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             correlation_id=correlation_id or str(uuid4()),
             event_type=event_type,
             payload=payload,
@@ -52,7 +52,7 @@ class ResearchCompleted(DomainEvent):
         """Factory method to create a research completed event."""
         return cls(
             event_id=str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             correlation_id=correlation_id or str(uuid4()),
             event_type="research.completed",
             payload={
@@ -85,7 +85,7 @@ class FactCheckCompleted(DomainEvent):
         """Factory method to create a fact-check completed event."""
         return cls(
             event_id=str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             correlation_id=correlation_id or str(uuid4()),
             event_type="fact_check.completed",
             payload={
@@ -116,7 +116,7 @@ class SynthesisCompleted(DomainEvent):
         """Factory method to create a synthesis completed event."""
         return cls(
             event_id=str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             correlation_id=correlation_id or str(uuid4()),
             event_type="synthesis.completed",
             payload={
@@ -147,7 +147,7 @@ class ReportWritten(DomainEvent):
         """Factory method to create a report written event."""
         return cls(
             event_id=str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             correlation_id=correlation_id or str(uuid4()),
             event_type="report.written",
             payload={
@@ -180,7 +180,7 @@ class ReportReviewed(DomainEvent):
         """Factory method to create a report reviewed event."""
         return cls(
             event_id=str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             correlation_id=correlation_id or str(uuid4()),
             event_type="report.reviewed",
             payload={
