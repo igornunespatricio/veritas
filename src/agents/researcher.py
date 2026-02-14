@@ -38,6 +38,21 @@ def search_web(query: str) -> str:
         return f"Web search failed: {str(e)}"
 
 
+# Define format tool for structured output
+@tool
+def format_report(sources: list[dict], findings: list[str]) -> str:
+    """Format research findings into structured output.
+
+    Args:
+        sources: List of source objects with url, title, date
+        findings: List of key findings
+
+    Returns:
+        Formatted JSON string
+    """
+    return json.dumps({"sources": sources, "findings": findings})
+
+
 class ResearcherAgent(BaseAgent[ResearchCompleted]):
     """Researcher Agent implementation.
 
@@ -48,16 +63,19 @@ class ResearcherAgent(BaseAgent[ResearchCompleted]):
     RESEARCHER_SYSTEM_PROMPT = """You are a professional researcher. Your task is to:
 1. Thoroughly research the given topic using the web search tool
 2. Find reliable sources and cite them properly
-3. Extract key findings and facts
+3. Extract key findings and facts from EACH source
 4. Organize information in a structured format
+
+IMPORTANT: You must extract AT LEAST 5 distinct findings from the search results.
+Each finding should be a unique piece of information from a different source.
 
 When you need current or specific information, use the search_web tool.
 Always verify information from multiple sources when possible.
 Provide citations for all claims with URLs and publication dates.
 
 Return your findings in JSON format with:
-- sources: list of source objects with url, title, date
-- findings: list of key findings as strings
+- sources: list of source objects with url, title, date (include ALL sources found)
+- findings: list of AT LEAST 5 distinct key findings as strings
 """
 
     def __init__(
@@ -97,8 +115,8 @@ Return your findings in JSON format with:
     ) -> ResearchCompleted:
         """Execute research on the given topic.
 
-        Uses direct tool calling pattern with web search tool to gather
-        information and produce structured research output.
+        Uses direct invocation with Tavily search to ensure we get
+        all search results, then uses LLM to extract findings.
 
         Args:
             topic: The research topic
@@ -114,99 +132,18 @@ Return your findings in JSON format with:
             logger.warning("LLM doesn't support tool calling, using direct invocation")
             return await self._run_direct(topic, context)
 
-        # Create LLM with tools bound
-        llm_with_tools = llm.bind_tools([search_web])
-
-        # Step 1: Ask the model to research the topic
-        research_prompt = (
-            f"Research the following topic thoroughly using the web search tool:\n\n"
-            f"Topic: {topic}\n\n"
-            f"Use the search_web tool to find relevant information, then provide your findings "
-            f"in JSON format with 'sources' and 'findings' keys."
-        )
-
-        response = await llm_with_tools.ainvoke([HumanMessage(content=research_prompt)])
-
-        # Step 2: Check if the model wants to call a tool
-        # Use getattr to safely access tool_calls with proper typing
-        tool_calls = getattr(response, "tool_calls", None)
-        if tool_calls:
-            # Execute the tool calls
-            tool_outputs = []
-
-            for tool_call in tool_calls:
-                tool_name = tool_call.get("name", "")
-                tool_args = tool_call.get("args", {})
-
-                # Call the search tool
-                if tool_name == "search_web":
-                    query = tool_args.get("query", topic)
-                    search_result = search_web.invoke(query)
-                    tool_outputs.append(
-                        {
-                            "tool": tool_name,
-                            "output": search_result,
-                        }
-                    )
-
-            # Step 3: Send tool outputs back to the model for final summary
-            if tool_outputs:
-                # Create tool response messages
-                from langchain_core.messages import ToolMessage
-
-                tool_messages = [
-                    ToolMessage(
-                        content=tool_output["output"],
-                        tool_call_id=f"call_{i}",
-                        name=tool_output["tool"],
-                    )
-                    for i, tool_output in enumerate(tool_outputs)
-                ]
-
-                # Ask for final structured output
-                final_prompt = (
-                    f"Based on the search results above, provide your final research findings "
-                    f"in JSON format with:\n"
-                    f"- 'sources': list of source objects with url, title, and date\n"
-                    f"- 'findings': list of key findings as strings\n\n"
-                    f"Topic: {topic}"
-                )
-
-                final_response = await llm_with_tools.ainvoke(
-                    tool_messages + [HumanMessage(content=final_prompt)]
-                )
-
-                # Extract content from final response
-                content = (
-                    final_response.content
-                    if hasattr(final_response, "content")
-                    else str(final_response)
-                )
-                sources, findings = self._parse_response(content)
-            else:
-                sources, findings = self._parse_response("")
-        else:
-            # No tool calls, parse direct response
-            content = (
-                response.content if hasattr(response, "content") else str(response)
-            )
-            sources, findings = self._parse_response(content)
-
-        return ResearchCompleted.create(
-            topic=topic,
-            sources=sources,
-            findings=findings,
-            correlation_id=context.correlation_id,
-        )
+        # Use direct invocation for more reliable results with small models
+        # This bypasses the ReAct pattern issues with Ollama 3.2:3b
+        return await self._run_direct(topic, context)
 
     async def _run_direct(
         self,
         topic: str,
         context: AgentContext,
     ) -> ResearchCompleted:
-        """Run research using direct invocation (fallback).
+        """Run research using direct invocation with tool binding.
 
-        Performs web search directly and processes results.
+        Performs web search directly and processes results with LLM.
 
         Args:
             topic: The research topic
@@ -215,23 +152,71 @@ Return your findings in JSON format with:
         Returns:
             ResearchCompleted event
         """
-        # Perform web search
+        llm = self.llm.llm
+
+        # Perform web search directly
         search_result = self._search_tool.invoke(topic)
 
-        # Use LLM to extract structured findings from search results
-        messages = [
-            SystemMessage(
-                content=self.RESEARCHER_SYSTEM_PROMPT
-                + "\n\nBased on the search results provided, extract key findings and sources."
-            ),
-            HumanMessage(
-                content=f"Research topic: {topic}\n\nSearch results:\n{search_result}\n\n"
-                "Provide findings in JSON format with sources and findings."
-            ),
-        ]
+        # Format the search results nicely
+        formatted_results = f"""TOPIC: {topic}
 
-        response = await self.llm.ainvoke(messages)
-        content = response.content if hasattr(response, "content") else str(response)
+SEARCH RESULTS:
+{search_result}
+
+IMPORTANT: Extract AT LEAST 5 distinct findings from the search results above.
+For each finding, identify which source it came from.
+
+Provide your findings in EXACTLY this JSON format:
+{{
+    "sources": [
+        {{"url": "source url", "title": "source title", "date": "publication date or N/A"}}
+    ],
+    "findings": [
+        "Finding 1: ...",
+        "Finding 2: ...",
+        "Finding 3: ...",
+        "Finding 4: ...",
+        "Finding 5: ..."
+    ]
+}}
+
+DO NOT include any other text - ONLY the JSON object."""
+
+        # Use LLM with bind_tools for structured output
+        if hasattr(llm, "bind_tools"):
+            llm_with_tools = llm.bind_tools([format_report])
+
+            response = await llm_with_tools.ainvoke(
+                [HumanMessage(content=formatted_results)]
+            )
+
+            # Check if tool was called
+            tool_calls = getattr(response, "tool_calls", None)
+            if tool_calls:
+                for tool_call in tool_calls:
+                    tool_name = tool_call.get("name", "")
+                    if tool_name == "format_report":
+                        result = format_report.invoke(tool_call.get("args", {}))
+                        data = json.loads(result)
+                        sources = data.get("sources", [])
+                        findings = data.get("findings", [])
+
+                        return ResearchCompleted.create(
+                            topic=topic,
+                            sources=sources,
+                            findings=findings,
+                            correlation_id=context.correlation_id,
+                        )
+
+            # Fallback to direct response
+            content = (
+                response.content if hasattr(response, "content") else str(response)
+            )
+        else:
+            response = await self.llm.ainvoke([HumanMessage(content=formatted_results)])
+            content = (
+                response.content if hasattr(response, "content") else str(response)
+            )
 
         sources, findings = self._parse_response(content)
 
