@@ -87,15 +87,34 @@ class TestResearcherAgentRun:
 
     @pytest.fixture
     def mock_llm(self):
-        """Create a mock resilient LLM wrapper with JSON response."""
-
-        def mock_ainvoke(messages):
-            return MagicMock(
-                content='{"sources": [{"url": "http://example.com", "title": "Test Source", "date": "2024-01-01"}], "findings": ["Finding 1", "Finding 2"]}'
+        """Create a mock resilient LLM wrapper with nested structure for tool calling."""
+        # Create inner LLM mock that supports bind_tools
+        inner_llm = MagicMock()
+        inner_llm.ainvoke = AsyncMock(
+            return_value=MagicMock(
+                tool_calls=[
+                    {
+                        "name": "format_report",
+                        "args": {
+                            "sources": [
+                                {
+                                    "url": "http://example.com",
+                                    "title": "Test Source",
+                                    "date": "2024-01-01",
+                                }
+                            ],
+                            "findings": ["Finding 1", "Finding 2"],
+                        },
+                    }
+                ]
             )
+        )
+        inner_llm.bind_tools = MagicMock(return_value=inner_llm)
 
+        # Create outer wrapper mock (ResilientLLMWrapper structure)
         mock = MagicMock()
-        mock.ainvoke = AsyncMock(side_effect=mock_ainvoke)
+        mock.llm = inner_llm
+        mock.ainvoke = inner_llm.ainvoke
         return mock
 
     @pytest.fixture

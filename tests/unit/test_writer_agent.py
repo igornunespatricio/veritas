@@ -79,14 +79,28 @@ class TestWriterAgentRun:
     @pytest.fixture
     def mock_llm(self):
         """Create a mock resilient LLM wrapper with JSON response."""
-
-        def mock_ainvoke(messages):
-            return MagicMock(
-                content='{"title": "Annual Technology Report 2024", "content": "# Report\\n\\nThis is the report content.", "format": "markdown"}'
+        # Create inner LLM mock that supports bind_tools
+        inner_llm = MagicMock()
+        inner_llm.ainvoke = AsyncMock(
+            return_value=MagicMock(
+                tool_calls=[
+                    {
+                        "name": "format_report",
+                        "args": {
+                            "title": "Annual Technology Report 2024",
+                            "content": "# Report\n\nThis is the report content.",
+                            "format": "markdown",
+                        },
+                    }
+                ]
             )
+        )
+        inner_llm.bind_tools = MagicMock(return_value=inner_llm)
 
+        # Create outer wrapper mock (ResilientLLMWrapper structure)
         mock = MagicMock()
-        mock.ainvoke = AsyncMock(side_effect=mock_ainvoke)
+        mock.llm = inner_llm
+        mock.ainvoke = inner_llm.ainvoke
         return mock
 
     @pytest.fixture
@@ -125,11 +139,18 @@ class TestWriterAgentRun:
         assert result.correlation_id == agent_context.correlation_id
 
     @pytest.mark.asyncio
-    async def test_run_handles_invalid_json_with_fallback(
-        self, mock_llm, agent_context
-    ):
+    async def test_run_handles_invalid_json_with_fallback(self, agent_context):
         """Test that _run handles invalid JSON response gracefully."""
-        mock_llm.ainvoke = AsyncMock(return_value=MagicMock(content="No JSON response"))
+        # Create fresh mock with invalid JSON response
+        inner_llm = MagicMock()
+        inner_llm.ainvoke = AsyncMock(
+            return_value=MagicMock(content="No JSON response")
+        )
+        inner_llm.bind_tools = MagicMock(return_value=inner_llm)
+
+        mock_llm = MagicMock()
+        mock_llm.llm = inner_llm
+        mock_llm.ainvoke = inner_llm.ainvoke
 
         with patch("src.agents.writer.BaseAgent.__init__", return_value=None):
             agent = WriterAgent()
@@ -151,13 +172,29 @@ class TestWriterAgentRun:
             assert result.title == "Research Report"
 
     @pytest.mark.asyncio
-    async def test_run_with_plain_format(self, mock_llm, agent_context):
+    async def test_run_with_plain_format(self, agent_context):
         """Test that _run handles plain text format correctly."""
-        mock_llm.ainvoke = AsyncMock(
+        # Create fresh mock with plain text response
+        inner_llm = MagicMock()
+        inner_llm.ainvoke = AsyncMock(
             return_value=MagicMock(
-                content='{"title": "Plain Text Report", "content": "Report content here", "format": "plain"}'
+                tool_calls=[
+                    {
+                        "name": "format_report",
+                        "args": {
+                            "title": "Plain Text Report",
+                            "content": "Report content here",
+                            "format": "plain",
+                        },
+                    }
+                ]
             )
         )
+        inner_llm.bind_tools = MagicMock(return_value=inner_llm)
+
+        mock_llm = MagicMock()
+        mock_llm.llm = inner_llm
+        mock_llm.ainvoke = inner_llm.ainvoke
 
         with patch("src.agents.writer.BaseAgent.__init__", return_value=None):
             agent = WriterAgent()
@@ -183,15 +220,33 @@ class TestWriterAgentIntegration:
 
     @pytest.fixture
     def mock_llm(self):
-        """Create a mock resilient LLM wrapper."""
-
-        def mock_ainvoke(messages):
-            return MagicMock(
-                content='{"title": "Q4 Market Analysis", "content": "# Q4 Market Analysis\\n\\n## Executive Summary\\n\\nStrong performance in key sectors.", "format": "markdown"}'
+        """Create a mock resilient LLM wrapper with proper nested structure."""
+        # Create inner LLM mock that supports bind_tools
+        inner_llm = MagicMock()
+        inner_llm.ainvoke = AsyncMock(
+            return_value=MagicMock(
+                tool_calls=[
+                    {
+                        "name": "format_report",
+                        "args": {
+                            "title": "Q4 Market Analysis",
+                            "content": "# Q4 Market Analysis\n\n## Executive Summary\n\nStrong performance in key sectors.",
+                            "format": "markdown",
+                        },
+                    }
+                ]
             )
+        )
 
+        # bind_tools returns the same mock (for chaining)
+        inner_llm.bind_tools = MagicMock(return_value=inner_llm)
+
+        # Create outer wrapper mock (ResilientLLMWrapper structure)
         mock = MagicMock()
-        mock.ainvoke = AsyncMock(side_effect=mock_ainvoke)
+        mock.llm = inner_llm
+        mock.ainvoke = inner_llm.ainvoke  # Also support direct access
+        # bind_tools on outer mock should delegate to inner_llm
+        mock.bind_tools = MagicMock(return_value=inner_llm)
         return mock
 
     @pytest.fixture
@@ -256,13 +311,29 @@ class TestWriterAgentIntegration:
             assert result.format == "markdown"  # Default
 
     @pytest.mark.asyncio
-    async def test_write_report_with_html_format(self, mock_llm, agent_context):
+    async def test_write_report_with_html_format(self, agent_context):
         """Test write report with HTML format."""
-        mock_llm.ainvoke = AsyncMock(
+        # Create a fresh mock for this test with HTML response
+        inner_llm = MagicMock()
+        inner_llm.ainvoke = AsyncMock(
             return_value=MagicMock(
-                content='{"title": "HTML Report", "content": "<h1>HTML Report</h1>", "format": "html"}'
+                tool_calls=[
+                    {
+                        "name": "format_report",
+                        "args": {
+                            "title": "HTML Report",
+                            "content": "<h1>HTML Report</h1>",
+                            "format": "html",
+                        },
+                    }
+                ]
             )
         )
+        inner_llm.bind_tools = MagicMock(return_value=inner_llm)
+
+        mock_llm = MagicMock()
+        mock_llm.llm = inner_llm
+        mock_llm.ainvoke = inner_llm.ainvoke
 
         with patch("src.agents.writer.BaseAgent.__init__", return_value=None):
             agent = WriterAgent()
