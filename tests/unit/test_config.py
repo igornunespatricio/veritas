@@ -1,14 +1,13 @@
 """Unit tests for configuration module."""
 
-import pytest
-from unittest.mock import patch, MagicMock
 import os
+from unittest.mock import patch
 
 from src.config import Settings
 from src.config.retry import (
-    RetryConfig,
-    RETRY_CONFIG_DEFAULT,
     RETRY_CONFIG_AGGRESSIVE,
+    RETRY_CONFIG_DEFAULT,
+    RetryConfig,
     is_retryable_error,
 )
 

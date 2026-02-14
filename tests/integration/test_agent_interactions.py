@@ -1,21 +1,22 @@
 """Agent-to-agent interaction integration tests."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from src.agents import (
-    ResearcherAgent,
+    CriticAgent,
     FactCheckerAgent,
+    ResearcherAgent,
     SynthesizerAgent,
     WriterAgent,
-    CriticAgent,
 )
 from src.domain.events import (
-    ResearchCompleted,
     FactCheckCompleted,
-    SynthesisCompleted,
-    ReportWritten,
     ReportReviewed,
+    ReportWritten,
+    ResearchCompleted,
+    SynthesisCompleted,
 )
 from src.domain.interfaces import AgentContext
 

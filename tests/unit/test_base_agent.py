@@ -1,8 +1,8 @@
 """Unit tests for BaseAgent."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+
+import pytest
 
 from src.agents.base import BaseAgent
 from src.domain.interfaces import AgentContext

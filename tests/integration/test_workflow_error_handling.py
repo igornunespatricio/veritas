@@ -1,19 +1,19 @@
 """Workflow error handling integration tests."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
-from typing import Any
 
-from src.orchestration.workflow import ResearchWorkflow, WorkflowStage
+import pytest
+
 from src.domain.events import (
-    ResearchCompleted,
     FactCheckCompleted,
-    SynthesisCompleted,
-    ReportWritten,
     ReportReviewed,
+    ReportWritten,
+    ResearchCompleted,
+    SynthesisCompleted,
 )
 from src.domain.interfaces import AgentContext
 from src.infrastructure.circuit_breaker import CircuitOpenError
+from src.orchestration.workflow import ResearchWorkflow, WorkflowStage
 
 
 class TestWorkflowErrorHandling:
@@ -412,7 +412,6 @@ class TestWorkflowRecovery:
     @pytest.mark.asyncio
     async def test_workflow_preserves_correlation_id_in_context(self):
         """Verify correlation ID is passed to agent context correctly."""
-        from src.domain.interfaces import AgentContext
 
         context = AgentContext.create(correlation_id="test-correlation-456")
 

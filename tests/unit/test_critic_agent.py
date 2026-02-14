@@ -1,7 +1,8 @@
 """Unit tests for CriticAgent."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.agents.critic import CriticAgent
 from src.domain.events import ReportReviewed, ReportWritten

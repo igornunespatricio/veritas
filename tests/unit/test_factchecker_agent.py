@@ -1,9 +1,10 @@
 """Unit tests for FactCheckerAgent."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.agents.factchecker import FactCheckerAgent, ClaimStatus
+import pytest
+
+from src.agents.factchecker import ClaimStatus, FactCheckerAgent
 from src.domain.events import FactCheckCompleted, ResearchCompleted
 from src.domain.interfaces import AgentContext
 

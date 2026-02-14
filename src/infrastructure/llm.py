@@ -1,29 +1,26 @@
 """LLM client infrastructure using LangChain with resilience features."""
 
-import asyncio
 import logging
-from typing import Any, Callable, TypeVar, Union
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from langchain_anthropic import ChatAnthropic
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from tenacity import (
+    after_log,
+    before_sleep_log,
     retry,
     stop_after_attempt,
     wait_exponential,
-    before_sleep_log,
-    after_log,
-    retry_if_exception_type,
 )
 
 from src.config import settings
 from src.config.retry import (
-    RetryConfig,
     RETRY_CONFIG_DEFAULT,
-    is_retryable_error,
+    RetryConfig,
 )
 from src.infrastructure.circuit_breaker import (
-    CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerRegistry,
     CircuitOpenError,
@@ -146,7 +143,7 @@ def get_ollama_llm(
 
 def get_llm(
     provider: str = "openai", **kwargs
-) -> Union[ChatOpenAI, ChatAnthropic, ChatOllama]:
+) -> ChatOpenAI | ChatAnthropic | ChatOllama:
     """Factory function to get LLM client based on provider.
 
     Args:
@@ -176,7 +173,7 @@ class ResilientLLMWrapper:
 
     def __init__(
         self,
-        llm: Union[ChatOpenAI, ChatAnthropic, ChatOllama],
+        llm: ChatOpenAI | ChatAnthropic | ChatOllama,
         retry_config: RetryConfig | None = None,
         circuit_config: CircuitBreakerConfig | None = None,
         correlation_id: str | None = None,
@@ -206,7 +203,7 @@ class ResilientLLMWrapper:
         )
 
     @property
-    def llm(self) -> Union[ChatOpenAI, ChatAnthropic, ChatOllama]:
+    def llm(self) -> ChatOpenAI | ChatAnthropic | ChatOllama:
         """Access the underlying LLM client."""
         return self._llm
 
@@ -286,7 +283,6 @@ class ResilientLLMWrapper:
             LLM response
         """
         # Use asyncio to run sync invoke in thread pool
-        import asyncio
 
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(

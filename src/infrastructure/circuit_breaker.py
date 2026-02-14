@@ -2,10 +2,11 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ class CircuitBreaker:
             # Check if cooldown has passed
             if self._opened_at and self._opened_at + timedelta(
                 seconds=self.config.cooldown_seconds
-            ) < datetime.now(timezone.utc):
+            ) < datetime.now(UTC):
                 self._transition_to(CircuitState.HALF_OPEN)
                 return CircuitState.HALF_OPEN
         return self._state
@@ -121,7 +122,7 @@ class CircuitBreaker:
         """Record a successful call."""
         self._stats.total_calls += 1
         self._stats.successful_calls += 1
-        self._stats.last_success_time = datetime.now(timezone.utc)
+        self._stats.last_success_time = datetime.now(UTC)
 
         if self._state == CircuitState.HALF_OPEN:
             self._success_count += 1
@@ -134,16 +135,16 @@ class CircuitBreaker:
         """Record a failed call."""
         self._stats.total_calls += 1
         self._stats.failed_calls += 1
-        self._stats.last_failure_time = datetime.now(timezone.utc)
-        self._last_failure_time = datetime.now(timezone.utc)
+        self._stats.last_failure_time = datetime.now(UTC)
+        self._last_failure_time = datetime.now(UTC)
 
         if self._state == CircuitState.HALF_OPEN:
             self._transition_to(CircuitState.OPEN)
-            self._opened_at = datetime.now(timezone.utc)
+            self._opened_at = datetime.now(UTC)
         elif self._state == CircuitState.CLOSED:
             self._failure_count += 1
             if self._failure_count >= self.config.failure_threshold:
-                self._opened_at = datetime.now(timezone.utc)
+                self._opened_at = datetime.now(UTC)
                 self._transition_to(CircuitState.OPEN)
 
     def allow_request(self) -> bool:
@@ -187,12 +188,12 @@ class CircuitBreaker:
             )
             self.record_success()
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.record_failure()
             raise CircuitTimeoutError(
                 f"Circuit '{self.name}' call timed out after {self.config.timeout_seconds}s"
             )
-        except Exception as e:
+        except Exception:
             self.record_failure()
             raise
 

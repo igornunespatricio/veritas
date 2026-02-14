@@ -1,7 +1,8 @@
 """Unit tests for SynthesizerAgent."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.agents.synthesizer import SynthesizerAgent
 from src.domain.events import FactCheckCompleted, ResearchCompleted, SynthesisCompleted

@@ -1,7 +1,8 @@
 """Unit tests for WriterAgent."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.agents.writer import WriterAgent
 from src.domain.events import ReportWritten, SynthesisCompleted

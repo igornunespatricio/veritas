@@ -1,10 +1,9 @@
 """Unit tests for retry configuration."""
 
-import pytest
 from src.config.retry import (
-    RetryConfig,
-    RETRY_CONFIG_DEFAULT,
     RETRY_CONFIG_AGGRESSIVE,
+    RETRY_CONFIG_DEFAULT,
+    RetryConfig,
     is_retryable_error,
 )
 

@@ -1,18 +1,17 @@
 """End-to-end workflow integration tests."""
 
-import asyncio
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-from src.orchestration.workflow import ResearchWorkflow, WorkflowStage
+import pytest
+
 from src.domain.events import (
-    ResearchCompleted,
     FactCheckCompleted,
-    SynthesisCompleted,
-    ReportWritten,
     ReportReviewed,
+    ReportWritten,
+    ResearchCompleted,
+    SynthesisCompleted,
 )
-from src.domain.interfaces import AgentContext
+from src.orchestration.workflow import ResearchWorkflow, WorkflowStage
 
 
 class TestFullWorkflowExecution:

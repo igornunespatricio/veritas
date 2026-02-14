@@ -1,7 +1,8 @@
 """Unit tests for web search tools infrastructure."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 class TestWebSearchTools:

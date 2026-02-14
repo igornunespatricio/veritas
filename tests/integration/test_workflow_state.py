@@ -1,17 +1,18 @@
 """Workflow state management integration tests."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from src.orchestration.workflow import ResearchWorkflow, WorkflowStage, WorkflowResult
+import pytest
+
 from src.domain.events import (
-    ResearchCompleted,
     FactCheckCompleted,
-    SynthesisCompleted,
-    ReportWritten,
     ReportReviewed,
+    ReportWritten,
+    ResearchCompleted,
+    SynthesisCompleted,
 )
 from src.domain.interfaces import AgentContext
+from src.orchestration.workflow import ResearchWorkflow, WorkflowResult, WorkflowStage
 
 
 class TestWorkflowResultState:

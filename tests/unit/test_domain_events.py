@@ -1,16 +1,15 @@
 """Unit tests for domain events."""
 
-import pytest
 from datetime import datetime
 from uuid import UUID
 
 from src.domain.events import (
     DomainEvent,
-    ResearchCompleted,
     FactCheckCompleted,
-    SynthesisCompleted,
-    ReportWritten,
     ReportReviewed,
+    ReportWritten,
+    ResearchCompleted,
+    SynthesisCompleted,
 )
 
 

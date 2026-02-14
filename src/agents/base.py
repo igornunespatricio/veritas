@@ -1,17 +1,16 @@
 """Base agent class with common functionality."""
 
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any
 
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from src.config.retry import RetryConfig, RETRY_CONFIG_DEFAULT
+from src.config.retry import RETRY_CONFIG_DEFAULT, RetryConfig
 from src.domain.interfaces import Agent, AgentContext, AgentResult
 from src.infrastructure.llm import (
-    get_llm,
-    get_resilient_llm,
     ResilientLLMWrapper,
+    get_resilient_llm,
 )
 
 logger = logging.getLogger(__name__)

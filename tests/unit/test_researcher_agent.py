@@ -1,10 +1,10 @@
 """Unit tests for ResearcherAgent."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from src.agents.researcher import ResearcherAgent
-from src.domain.events import ResearchCompleted
 from src.domain.interfaces import AgentContext
 
 

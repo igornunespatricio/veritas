@@ -5,9 +5,9 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from src.agents.base import BaseAgent
 from src.domain.events import ReportReviewed, ReportWritten
 from src.domain.interfaces import AgentContext
-from src.agents.base import BaseAgent
 
 
 class CriticAgent(BaseAgent[ReportReviewed]):

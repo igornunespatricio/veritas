@@ -1,16 +1,17 @@
 """Workflow configuration integration tests."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from src.orchestration.workflow import ResearchWorkflow, WorkflowStage
+import pytest
+
 from src.domain.events import (
-    ResearchCompleted,
     FactCheckCompleted,
-    SynthesisCompleted,
-    ReportWritten,
     ReportReviewed,
+    ReportWritten,
+    ResearchCompleted,
+    SynthesisCompleted,
 )
+from src.orchestration.workflow import ResearchWorkflow, WorkflowStage
 
 
 class TestWorkflowCustomConfiguration:

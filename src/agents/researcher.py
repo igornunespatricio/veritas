@@ -4,13 +4,13 @@ import json
 import logging
 from typing import Any
 
+from langchain import hub
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
-from langchain import hub
 
+from src.agents.base import BaseAgent
 from src.domain.events import ResearchCompleted
 from src.domain.interfaces import AgentContext
-from src.agents.base import BaseAgent
 from src.infrastructure.tools import get_web_search_tool
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,7 @@ Return your findings in JSON format with:
 
         if react_prompt:
             # Use LangChain's ReAct agent pattern
-            from langchain.agents import create_react_agent, AgentExecutor
+            from langchain.agents import AgentExecutor, create_react_agent
 
             llm = self.llm.llm
 

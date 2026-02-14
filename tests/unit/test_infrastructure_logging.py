@@ -1,9 +1,6 @@
 """Unit tests for logging infrastructure."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-import sys
-from io import StringIO
+from unittest.mock import MagicMock, patch
 
 
 class TestLoggingSetup:
@@ -13,7 +10,6 @@ class TestLoggingSetup:
     def test_setup_logging_development(self, mock_logger):
         """Test logging setup in development mode."""
         from src.infrastructure.logging import setup_logging
-        from src.config import Settings
 
         # Create mock settings
         mock_settings = MagicMock()

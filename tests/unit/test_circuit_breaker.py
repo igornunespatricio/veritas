@@ -1,14 +1,13 @@
 """Unit tests for circuit breaker implementation."""
 
-import asyncio
 import pytest
+
 from src.infrastructure.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
-    CircuitState,
     CircuitBreakerRegistry,
     CircuitOpenError,
-    CircuitTimeoutError,
+    CircuitState,
 )
 
 
