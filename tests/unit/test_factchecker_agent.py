@@ -114,8 +114,15 @@ class TestFactCheckerAgentRun:
 
         result = await fact_check_agent._run(research, agent_context)
 
-        assert len(result.claims) == 1
+        # The LLM returned 1 claim ("Claim 1") but there are 2 findings.
+        # The claim doesn't match any finding fingerprint, so both get added.
+        # Result: 1 original + 2 auto-generated = 3 claims
+        assert len(result.claims) == 3
+        # First claim is the original from LLM (verified)
         assert result.claims[0]["status"] == "verified"
+        # Second and third claims are auto-generated for missing findings
+        assert result.claims[1]["status"] == "unverified"
+        assert result.claims[2]["status"] == "unverified"
         assert result.confidence_scores.get("Claim 1") == 0.9
         assert result.correlation_id == agent_context.correlation_id
 
@@ -239,6 +246,121 @@ class TestClaimStatus:
             ClaimStatus.UNVERIFIED,
         }
         assert actual_statuses == expected_statuses
+
+
+class TestEnsureClaimsCoverage:
+    """Tests for _ensure_claims_coverage method."""
+
+    @pytest.fixture
+    def mock_llm(self):
+        """Create a mock LLM wrapper."""
+        mock = MagicMock()
+        mock.ainvoke = AsyncMock(return_value=MagicMock(content="{}"))
+        return mock
+
+    @pytest.fixture
+    def fact_check_agent(self, mock_llm):
+        """Create a FactCheckerAgent for testing coverage logic."""
+        with patch("src.agents.factchecker.BaseAgent.__init__", return_value=None):
+            agent = FactCheckerAgent()
+            agent._llm = mock_llm
+            agent._name = "fact_checker"
+            agent._description = ""
+            return agent
+
+    def test_returns_claims_unchanged_when_sufficient(self, fact_check_agent):
+        """Test that claims are returned unchanged when count >= findings count."""
+        claims = [
+            {"text": "Finding 1", "status": "verified"},
+            {"text": "Finding 2", "status": "unverified"},
+        ]
+        findings = ["Finding 1", "Finding 2"]
+
+        result = fact_check_agent._ensure_claims_coverage(claims, findings)
+
+        assert len(result) == 2
+        assert result == claims
+
+    def test_returns_claims_unchanged_when_more_than_findings(self, fact_check_agent):
+        """Test that claims are returned unchanged when count > findings count."""
+        claims = [
+            {"text": "Finding 1", "status": "verified"},
+            {"text": "Finding 2", "status": "verified"},
+            {"text": "Combined finding", "status": "partially_verified"},
+        ]
+        findings = ["Finding 1", "Finding 2"]
+
+        result = fact_check_agent._ensure_claims_coverage(claims, findings)
+
+        # Should return all claims since count >= findings
+        assert len(result) == 3
+
+    def test_adds_missing_claims_when_fewer(self, fact_check_agent):
+        """Test that missing claims are added when LLM returns fewer."""
+        claims = [{"text": "Finding 1", "status": "verified"}]
+        findings = ["Finding 1", "Finding 2", "Finding 3"]
+
+        result = fact_check_agent._ensure_claims_coverage(claims, findings)
+
+        assert len(result) == 3
+        assert result[0]["text"] == "Finding 1"
+        assert result[1]["text"] == "Finding 2"
+        assert result[1]["status"] == "unverified"
+        assert "note" in result[1]
+        assert "Auto-generated" in result[1]["note"]
+
+    def test_adds_all_claims_when_empty(self, fact_check_agent):
+        """Test that all findings become claims when LLM returns none."""
+        claims = []
+        findings = ["Finding A", "Finding B"]
+
+        result = fact_check_agent._ensure_claims_coverage(claims, findings)
+
+        assert len(result) == 2
+        assert all(c["status"] == "unverified" for c in result)
+
+    def test_empty_findings_returns_claims_unchanged(self, fact_check_agent):
+        """Test that empty findings return claims unchanged."""
+        claims = [{"text": "Some claim", "status": "verified"}]
+        findings = []
+
+        result = fact_check_agent._ensure_claims_coverage(claims, findings)
+
+        assert result == claims
+
+    def test_empty_both_returns_empty(self, fact_check_agent):
+        """Test that empty claims and findings returns empty list."""
+        result = fact_check_agent._ensure_claims_coverage([], [])
+
+        assert result == []
+
+    def test_fingerprint_matching_detects_similar(self, fact_check_agent):
+        """Test that fingerprint matching identifies covered findings."""
+        # LLM paraphrases "Global temperatures are rising" as "Earth's temperature is increasing"
+        # These have different first 50 chars, so both findings get added
+        claims = [{"text": "Earth's temperature is increasing", "status": "verified"}]
+        findings = ["Global temperatures are rising", "CO2 levels increasing"]
+
+        result = fact_check_agent._ensure_claims_coverage(claims, findings)
+
+        # Fingerprint matching uses first 50 chars which don't overlap,
+        # so all findings become separate claims
+        assert len(result) == 3
+        assert result[0]["text"] == "Earth's temperature is increasing"
+        assert result[1]["text"] == "Global temperatures are rising"
+        assert result[2]["text"] == "CO2 levels increasing"
+
+    def test_added_claims_have_unverified_status(self, fact_check_agent):
+        """Test that auto-added claims always have unverified status."""
+        claims = [{"text": "Finding 1", "status": "verified"}]
+        findings = ["Finding 1", "Finding 2"]
+
+        result = fact_check_agent._ensure_claims_coverage(claims, findings)
+
+        # Original claim keeps its status
+        assert result[0]["status"] == "verified"
+        # Added claim gets unverified status
+        assert result[1]["status"] == "unverified"
 
 
 class TestFactCheckerAgentIntegration:

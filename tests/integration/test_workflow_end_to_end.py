@@ -1,6 +1,6 @@
 """End-to-end workflow integration tests."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -421,3 +421,75 @@ class TestFullWorkflowExecution:
             # Should auto-approve because score >= threshold
             assert result.status == WorkflowStage.COMPLETED
             assert result.iterations == 1
+
+    @pytest.mark.asyncio
+    async def test_fact_check_coverage_logic_when_llm_returns_fewer_claims(
+        self, ollama_config
+    ):
+        """Test that fact-checker adds missing claims when LLM returns fewer than findings.
+
+        This tests the _ensure_claims_coverage integration with the full _run method.
+        When the LLM combines or misses findings, the fallback should add them.
+        """
+        workflow = ResearchWorkflow(
+            max_iterations=1,
+            auto_approve_threshold=0.8,
+            llm_provider="ollama",
+            llm_model="llama3.2:3b",
+        )
+
+        # Mock LLM that returns only 1 claim for 3 findings
+        async def mock_ainvoke(messages):
+            # Simulate LLM combining findings into 1 claim
+            return MagicMock(
+                content='{"claims": [{"text": "Some combined claim about multiple topics", "status": "verified"}], "verified_claims": [{"text": "Some combined claim about multiple topics", "status": "verified"}], "confidence_scores": {"Some combined claim about multiple topics": 0.8}}'
+            )
+
+        with (
+            patch.object(
+                workflow.researcher, "research", new_callable=AsyncMock
+            ) as mock_research,
+            patch.object(
+                workflow.synthesizer, "synthesize", new_callable=AsyncMock
+            ) as mock_synthesize,
+            patch.object(
+                workflow.writer, "write_report", new_callable=AsyncMock
+            ) as mock_write,
+            patch.object(
+                workflow.critic, "review", new_callable=AsyncMock
+            ) as mock_review,
+        ):
+
+            mock_research.return_value = ResearchCompleted.create(
+                topic="test topic",
+                sources=[{"url": "", "title": "", "date": ""}],
+                findings=[
+                    "Finding 1 about quantum computing",
+                    "Finding 2 about superposition",
+                    "Finding 3 about entanglement",
+                ],
+            )
+
+            # Override the LLM for fact-checker to return fewer claims
+            workflow.fact_checker._llm.ainvoke = AsyncMock(side_effect=mock_ainvoke)
+
+            mock_synthesize.return_value = SynthesisCompleted.create(
+                insights=["insight"],
+                resolved_contradictions=[],
+            )
+            mock_write.return_value = ReportWritten.create(
+                title="Report", content="Content", format="markdown"
+            )
+            mock_review.return_value = ReportReviewed.create(
+                suggestions=[], score=0.9, approved=True
+            )
+
+            result = await workflow.execute("test topic")
+
+            # Verify that claims count equals or exceeds findings count (coverage ensured)
+            assert result.fact_check is not None
+            # LLM returned 1 combined claim, fingerprint doesn't match any finding,
+            # so all 3 findings get added as separate claims + 1 original = 4 total
+            assert len(result.fact_check.claims) == 4
+            # All 3 findings were auto-generated as separate claims
+            assert len([c for c in result.fact_check.claims if "note" in c]) == 3
