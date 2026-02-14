@@ -4,7 +4,6 @@ import json
 import logging
 from typing import Any
 
-from langchain import hub
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 
@@ -98,7 +97,7 @@ Return your findings in JSON format with:
     ) -> ResearchCompleted:
         """Execute research on the given topic.
 
-        Uses ReAct agent pattern with web search tool to gather
+        Uses direct tool calling pattern with web search tool to gather
         information and produce structured research output.
 
         Args:
@@ -108,50 +107,90 @@ Return your findings in JSON format with:
         Returns:
             ResearchCompleted event with sources and findings
         """
-        # Try to get the latest ReAct prompt from hub
-        try:
-            react_prompt = hub.pull("hwchase17/react")
-        except Exception:
-            # Fallback to custom prompt if hub is unavailable
-            react_prompt = None
+        llm = self.llm.llm
 
-        if react_prompt:
-            # Use LangChain's ReAct agent pattern
-            from langchain.agents import AgentExecutor, create_react_agent
-
-            llm = self.llm.llm
-
-            # Ensure the LLM has tool-calling capability
-            if not hasattr(llm, "bind_tools"):
-                # For non-tool-calling LLMs, fall back to direct invocation
-                logger.warning(
-                    "LLM doesn't support tool calling, using direct invocation"
-                )
-                return await self._run_direct(topic, context)
-
-            agent = create_react_agent(llm, self._tools, react_prompt)
-            agent_executor = AgentExecutor(
-                agent=agent,
-                tools=self._tools,
-                verbose=True,
-                handle_parsing_errors=True,
-            )
-
-            # Run the agent with the topic
-            response = await agent_executor.ainvoke(
-                {
-                    "input": f"Research the following topic thoroughly and provide findings in JSON format with 'sources' and 'findings': {topic}"
-                }
-            )
-
-            # Parse the response
-            content = response.get("output", "")
-
-            # Try to extract JSON from the response
-            sources, findings = self._parse_response(content)
-        else:
-            # Fallback to direct invocation with tool message
+        # Check if LLM supports tool calling
+        if not hasattr(llm, "bind_tools"):
+            logger.warning("LLM doesn't support tool calling, using direct invocation")
             return await self._run_direct(topic, context)
+
+        # Create LLM with tools bound
+        llm_with_tools = llm.bind_tools([search_web])
+
+        # Step 1: Ask the model to research the topic
+        research_prompt = (
+            f"Research the following topic thoroughly using the web search tool:\n\n"
+            f"Topic: {topic}\n\n"
+            f"Use the search_web tool to find relevant information, then provide your findings "
+            f"in JSON format with 'sources' and 'findings' keys."
+        )
+
+        response = await llm_with_tools.ainvoke([HumanMessage(content=research_prompt)])
+
+        # Step 2: Check if the model wants to call a tool
+        # Use getattr to safely access tool_calls with proper typing
+        tool_calls = getattr(response, "tool_calls", None)
+        if tool_calls:
+            # Execute the tool calls
+            tool_outputs = []
+
+            for tool_call in tool_calls:
+                tool_name = tool_call.get("name", "")
+                tool_args = tool_call.get("args", {})
+
+                # Call the search tool
+                if tool_name == "search_web":
+                    query = tool_args.get("query", topic)
+                    search_result = search_web.invoke(query)
+                    tool_outputs.append(
+                        {
+                            "tool": tool_name,
+                            "output": search_result,
+                        }
+                    )
+
+            # Step 3: Send tool outputs back to the model for final summary
+            if tool_outputs:
+                # Create tool response messages
+                from langchain_core.messages import ToolMessage
+
+                tool_messages = [
+                    ToolMessage(
+                        content=tool_output["output"],
+                        tool_call_id=f"call_{i}",
+                        name=tool_output["tool"],
+                    )
+                    for i, tool_output in enumerate(tool_outputs)
+                ]
+
+                # Ask for final structured output
+                final_prompt = (
+                    f"Based on the search results above, provide your final research findings "
+                    f"in JSON format with:\n"
+                    f"- 'sources': list of source objects with url, title, and date\n"
+                    f"- 'findings': list of key findings as strings\n\n"
+                    f"Topic: {topic}"
+                )
+
+                final_response = await llm_with_tools.ainvoke(
+                    tool_messages + [HumanMessage(content=final_prompt)]
+                )
+
+                # Extract content from final response
+                content = (
+                    final_response.content
+                    if hasattr(final_response, "content")
+                    else str(final_response)
+                )
+                sources, findings = self._parse_response(content)
+            else:
+                sources, findings = self._parse_response("")
+        else:
+            # No tool calls, parse direct response
+            content = (
+                response.content if hasattr(response, "content") else str(response)
+            )
+            sources, findings = self._parse_response(content)
 
         return ResearchCompleted.create(
             topic=topic,
@@ -203,15 +242,22 @@ Return your findings in JSON format with:
             correlation_id=context.correlation_id,
         )
 
-    def _parse_response(self, content: str) -> tuple[list[dict], list[str]]:
+    def _parse_response(self, content: Any) -> tuple[list[dict], list[str]]:
         """Parse JSON from LLM response.
 
         Args:
-            content: Raw response content
+            content: Raw response content (can be str or list)
 
         Returns:
             Tuple of (sources, findings)
         """
+        # Ensure content is a string
+        if isinstance(content, list):
+            # Handle list responses (e.g., from some Ollama versions)
+            content = str(content)
+        elif not isinstance(content, str):
+            content = str(content)
+
         try:
             # Try to extract JSON from response
             json_start = content.find("{")
