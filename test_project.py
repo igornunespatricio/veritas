@@ -18,15 +18,15 @@ async def main():
     # Initialize the workflow
     # workflow = ResearchWorkflow()
     workflow = ResearchWorkflow(
-        llm_provider="ollama",
-        llm_model="llama3.2:3b",
+        llm_provider="openrouter",  # "ollama",
+        llm_model="openrouter/aurora-alpha",  # "llama3.2:3b",
         auto_approve_threshold=0.7,
         max_iterations=2,
-        max_tokens=10000,
+        # max_tokens=10000,
     )
 
     # Test topic
-    topic = "What is quantum computing and how does it work?"
+    topic = "Summarize the Star Wars saga?"
 
     print(f"\nTopic: {topic}")
     print("-" * 60)

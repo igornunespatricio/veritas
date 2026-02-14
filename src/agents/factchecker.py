@@ -8,6 +8,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from src.agents.base import BaseAgent
 from src.domain.events import FactCheckCompleted, ResearchCompleted
 from src.domain.interfaces import AgentContext
+from src.infrastructure.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # Claim verification status constants
@@ -84,8 +87,11 @@ values listed above."""
                 f"TOPIC: {research_event.topic}\n\n"
                 f"FINDINGS:\n{findings_text}\n\n"
                 f"SOURCES:\n{sources_text}\n\n"
+                "IMPORTANT: You MUST create exactly ONE claim for EACH finding above.\n"
+                "Do NOT combine, merge, or summarize multiple findings into one claim.\n"
+                "Each finding must become a separate claim with its own status.\n\n"
                 "Provide your analysis in JSON format with:\n"
-                "- claims: list of objects with 'text' and 'status' keys\n"
+                "- claims: list of objects with 'text' and 'status' keys (MUST have one per finding)\n"
                 "- verified_claims: list of verified claims with status\n"
                 "- confidence_scores: dict mapping claim text to score (0.0-1.0)\n\n"
                 "Each claim must have status: verified, partially_verified, disputed, or unverified"
@@ -118,12 +124,72 @@ values listed above."""
         claims = self._normalize_claim_statuses(claims)
         verified_claims = self._normalize_claim_statuses(verified_claims)
 
+        # Ensure we have a claim for each finding (fallback if LLM missed some)
+        claims = self._ensure_claims_coverage(claims, research_event.findings)
+
         return FactCheckCompleted.create(
             claims=claims,
             verified_claims=verified_claims,
             confidence_scores=confidence_scores,
             correlation_id=context.correlation_id,
         )
+
+    def _ensure_claims_coverage(
+        self,
+        claims: list[dict[str, Any]],
+        findings: list[str],
+    ) -> list[dict[str, Any]]:
+        """Ensure we have a claim for each finding.
+
+        If the LLM extracted fewer claims than findings, create individual claims
+        for the missing findings (since LLM may have combined them or missed them).
+
+        Args:
+            claims: Claims extracted by LLM
+            findings: Original research findings
+
+        Returns:
+            Claims with guaranteed coverage for all findings
+        """
+        # If we have at least as many claims as findings, we're good
+        if len(claims) >= len(findings):
+            return claims
+
+        # LLM returned fewer claims than findings - add missing ones
+        # (This handles cases where LLM combined findings or missed some)
+        findings_set = set(f.strip().lower() for f in findings)
+
+        # Find findings not already covered by claim text
+        missing_findings = []
+        for finding in findings:
+            finding_normalized = finding.strip().lower()
+            # Check if this finding's key content is represented in any claim
+            # Use first 50 chars as a simple fingerprint
+            fingerprint = finding_normalized[:50]
+            is_covered = any(
+                fingerprint in c.get("text", "").lower()[:50] for c in claims
+            )
+            if not is_covered:
+                missing_findings.append(finding)
+
+        # Create claims for missing findings
+        missing_claims = [
+            {
+                "text": finding,
+                "status": ClaimStatus.UNVERIFIED,
+                "note": "Auto-generated - LLM did not extract this finding",
+            }
+            for finding in missing_findings
+        ]
+
+        if missing_claims:
+            logger.warning(
+                f"LLM extracted {len(claims)} claims but found {len(findings)} findings. "
+                f"Adding {len(missing_claims)} missing claims with UNVERIFIED status."
+            )
+            return claims + missing_claims
+
+        return claims
 
     def _normalize_claim_statuses(
         self, claims: list[dict[str, Any]]
