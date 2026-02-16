@@ -8,6 +8,7 @@ from .agents import (
     SynthesizerAgent,
     WriterAgent,
 )
+from .api import app
 from .config import settings
 from .domain import (
     Agent,
@@ -55,4 +56,6 @@ __all__ = [
     "WorkflowStage",
     # Config
     "settings",
+    # API
+    "app",
 ]
