@@ -41,6 +41,8 @@ def _convert_workflow_result(
     job_id: str, result: WorkflowResult
 ) -> ResearchJobResponse:
     """Convert WorkflowResult to API response model."""
+    import traceback
+
     now = datetime.now(UTC)
     created_at = job_id in _jobs and _jobs[job_id].get("created_at") or now
 
@@ -195,6 +197,8 @@ async def submit_research(
 )
 async def get_research_job(job_id: str) -> ResearchJobResponse:
     """Get the status and results of a research job."""
+    import traceback
+
     if job_id not in _jobs:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -218,7 +222,20 @@ async def get_research_job(job_id: str) -> ResearchJobResponse:
 
     # If completed/failed, return full results
     if "result" in job:
-        return _convert_workflow_result(job_id, job["result"])
+        try:
+            return _convert_workflow_result(job_id, job["result"])
+        except Exception as e:
+            # Log the error and return partial response
+            print(f"Error converting result: {e}")
+            traceback.print_exc()
+            return ResearchJobResponse(
+                job_id=job_id,
+                status=job["status"],
+                topic=job.get("topic", ""),
+                created_at=job.get("created_at", now),
+                updated_at=job.get("updated_at", now),
+                error=f"Error processing result: {str(e)}",
+            )
 
     # Failed job without result
     return ResearchJobResponse(
@@ -234,25 +251,44 @@ async def get_research_job(job_id: str) -> ResearchJobResponse:
 @router.get(
     "",
     response_model=list[ResearchStatusResponse],
-    summary="List all research jobs",
-    description="Get a list of all research jobs and their statuses.",
+    summary="List research jobs",
+    description="Get a list of research jobs with optional filtering and sorting.",
 )
-async def list_research_jobs() -> list[ResearchStatusResponse]:
-    """List all research jobs."""
+async def list_research_jobs(
+    job_status: JobStatus = JobStatus.COMPLETED,
+    limit: int = 10,
+    sort_order: str = "desc",
+) -> list[ResearchStatusResponse]:
+    """List research jobs with filtering, sorting, and limiting."""
+    # Filter jobs by status
+    filtered_jobs = [
+        (job_id, job) for job_id, job in _jobs.items() if job["status"] == job_status
+    ]
+
+    # Sort by updated_at
+    reverse = sort_order.lower() == "desc"
+    filtered_jobs.sort(
+        key=lambda x: x[1].get("updated_at", datetime.min.replace(tzinfo=UTC)),
+        reverse=reverse,
+    )
+
+    # Limit results
+    limited_jobs = filtered_jobs[:limit]
+
+    # Build response
     jobs = []
-    for job_id, job in _jobs.items():
-        if job["status"] in (JobStatus.PENDING, JobStatus.PROCESSING):
-            jobs.append(
-                ResearchStatusResponse(
-                    job_id=job_id,
-                    status=job["status"],
-                    topic=job["topic"],
-                    created_at=job["created_at"],
-                    updated_at=job.get("updated_at", datetime.now(UTC)),
-                    current_stage=job.get("current_stage"),
-                    progress_percentage=job.get("progress_percentage"),
-                )
+    for job_id, job in limited_jobs:
+        jobs.append(
+            ResearchStatusResponse(
+                job_id=job_id,
+                status=job["status"],
+                topic=job["topic"],
+                created_at=job["created_at"],
+                updated_at=job.get("updated_at", datetime.now(UTC)),
+                current_stage=job.get("current_stage"),
+                progress_percentage=job.get("progress_percentage"),
             )
+        )
     return jobs
 
 

@@ -106,9 +106,9 @@ class ResearchJobResponse(ResearchStatusResponse):
     )
 
     # Synthesis results
-    insights: list[str] | None = Field(
+    insights: list[Any] | None = Field(
         default=None,
-        description="Synthesized insights",
+        description="Synthesized insights (can be strings or dicts)",
     )
 
     # Report results
@@ -136,9 +136,9 @@ class ResearchJobResponse(ResearchStatusResponse):
         default=None,
         description="Whether report was approved",
     )
-    review_suggestions: list[str] | None = Field(
+    review_suggestions: list[Any] | None = Field(
         default=None,
-        description="Reviewer suggestions",
+        description="Reviewer suggestions (can be strings or dicts)",
     )
     review_iterations: int | None = Field(
         default=None,
