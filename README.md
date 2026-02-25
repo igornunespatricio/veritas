@@ -283,6 +283,22 @@ uvicorn src.api.main:app --reload --env-file .env
 open http://localhost:8000/docs
 ```
 
+## Future Improvements
+
+The following enhancements would significantly improve the platform:
+
+**1. Persistent Storage** - Currently jobs are stored in-memory, meaning all data is lost on restart. Adding PostgreSQL would ensure data persists across deployments and enable proper job history tracking.
+
+**2. API Keys in Requests** - Allowing users to pass their own API keys in API requests would enable multi-tenant usage without requiring environment variable changes, making the system more flexible for different users.
+
+**3. Web UI** - A chat-like interface where users can input topics, configure parameters, and view formatted results would greatly improve the user experience over raw JSON responses.
+
+**4. Cloud Deployment** - Deploying to a cloud provider would make the platform accessible to anyone without local setup. This should be done after persistent storage is implemented.
+
+**5. Authentication** - Adding user authentication would secure the API and enable user-specific job tracking and management.
+
+**6. Rate Limiting** - Implementing rate limiting would protect the API from abuse and ensure fair resource allocation among users.
+
 ## License
 
 MIT
